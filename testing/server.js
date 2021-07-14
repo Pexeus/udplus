@@ -1,5 +1,5 @@
 const udplus = require("../index")
-const server = udplus.createServer(1000)
+const server = udplus.createServer()
 const fs = require("fs")
 
 
