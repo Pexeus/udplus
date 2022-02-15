@@ -1,0 +1,20 @@
+{
+  "name": "udplus",
+  "version": "1.1.0",
+  "description": "This Package offers a simple and easy to set up wrapper around Nodes internal \"dgram\" Module. It offers server and client side Functions. The API is inspired by the \"Socket.io\" Package.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Pexeus/udplus.git"
+  },
+  "keywords": ["back-end", "udp", "socket", "networking"],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Pexeus/udplus/issues"
+  },
+  "homepage": "https://github.com/Pexeus/udplus#readme"
+}
