@@ -173,11 +173,12 @@ function createServer() {
         }
 
         if (!registered) {
-            const newClient = {
-                address: client.address,
-                port: client.port,
-                lastSignal: Date.now(),
-            }
+            //create event emitter for client
+            const newClient = new EventEmitter()
+
+            newClient.address = client.address
+            newClient.port = client.port
+            newClient.lastSignal = Date.now()
 
             clients.push(newClient)
 
@@ -199,6 +200,16 @@ function createServer() {
         })
     }
 
+    function getClient(info) {
+        for (const client of clients) {
+            if (client.address == info.address && client.port == info.port) {
+                return client;
+            }
+        }
+
+        return false;
+    }
+
     server.on("error", err => {
         console.log(`UDP Server has errored: ${err}`);
     })
@@ -208,7 +219,16 @@ function createServer() {
 
         if (typeof data === "object") {
             registerClient(data, info)
+
+            //emit on main emitter
             events.emit(data.channel, data.data)
+
+            //emit on client object
+            const client = getClient(info)
+            
+            if (client) {
+                client.emit(data.channel, data.data)
+            }
         }
     })
 
