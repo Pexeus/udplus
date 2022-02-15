@@ -5,7 +5,7 @@ const signature = Buffer.from("______")
 const splitter = Buffer.from("||")
 var timeout = 3000
 const reserved = [signature, splitter, "connection", "disconnected", "keep-alive"]
-var logging = true
+var logging = false
 
 
 
