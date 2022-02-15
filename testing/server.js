@@ -12,9 +12,9 @@ server.listen(3000, info => {
 server.on("connection", client => {
     console.log("client connected: ", client.address);
 
-    client.on("test", data => {
-        console.log(data);
-    })
+    setInterval(() => {
+        client.send("test", client.address)
+    }, 1000);
 })
 
 server.on("test", data => {

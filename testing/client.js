@@ -15,6 +15,6 @@ client.on("connection", info => {
 
 const image = fs.readFileSync("./testing/image.png")
 
-setInterval(() => {
-    client.emit("test", "das ist ein test ja")
-}, 1000);
+client.on("test", data => {
+    console.log(data);
+})

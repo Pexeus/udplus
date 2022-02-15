@@ -99,6 +99,9 @@ function createClient() {
     const events = new EventEmitter();
     const connection = {}
 
+    //scuffed naming fix
+    events.dispatch = events.emit
+
     function internalAction(data, info) {
         if (data.channel == "connection") {
             log(`connection established with ${info.address}:${info.port}`)
@@ -121,12 +124,14 @@ function createClient() {
 
     client.on("message", (buffer, info) => {
         const data = decode(buffer)
-
-        log(`Message recieved from ${info.address}:${info.port}`)
         
         if (data != undefined) {
             if (reserved.includes(data.channel)) {
                 internalAction(data, info)
+            }
+            else {
+                //log(`Message recieved from ${info.address}:${info.port}`)
+                events.dispatch(data.channel, data.data)
             }
         }
     })
@@ -176,6 +181,10 @@ function createServer() {
             //create event emitter for client
             const newClient = new EventEmitter()
 
+            newClient.send = (channel, data) => {
+                dispatch(channel, data, newClient)
+            }
+
             newClient.address = client.address
             newClient.port = client.port
             newClient.lastSignal = Date.now()
@@ -195,7 +204,7 @@ function createServer() {
                 console.log(err);
             }
             else {
-                log(`Data Sent to ${client.address}:${client.port}`)
+                //log(`Data Sent to ${client.address}:${client.port}`)
             }
         })
     }
