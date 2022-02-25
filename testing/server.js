@@ -4,7 +4,6 @@ const fs = require("fs")
 
 console.log("--- SERVER ----");
 
-
 server.listen(3000, info => {
     console.log("listening on: " + info);
 })
@@ -12,13 +11,17 @@ server.listen(3000, info => {
 server.on("connection", client => {
     console.log("client connected: ", client.address);
 
-    client.on("custom-event", data => {
+    client.emit("keepalive", "jadjasdj")
+
+    client.on("testus", data => {
         console.log(data);
     })
 
-    client.emit("custom-event", data)
+    setInterval(() => {
+        server.emit("broadcast", {hallo: "jawoo"})
+    }, 1000);
 })
 
-server.on("test", data => {
-    //console.log(data);
+server.on("raw", data => {
+    console.log(String(data));
 })

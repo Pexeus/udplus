@@ -1,11 +1,10 @@
-const udp = require('dgram');
+  const udp = require('dgram');
 const EventEmitter = require('events');
 
-const signature = Buffer.from("______")
-const splitter = Buffer.from("||")
+const signature = Buffer.from("[udplus]")
 var timeout = 3000
-const reserved = [signature, splitter, "connection", "disconnected", "keep-alive"]
-var logging = false
+const reserved = [signature, "connection", "disconnected", "keep-alive", "|"]
+var logging = true
 
 
 
@@ -23,75 +22,155 @@ module.exports = {
 
 function log(message) {
     if (logging) {
-        console.log(message);
+        console.log(`[udplus]`, message);
+    }
+}
+
+function decode(buffer) {
+    const head = buffer.slice(0, signature.length)
+    const isUdplus = Buffer.compare(head, signature) === 0
+
+    if (!isUdplus) {
+        return {
+            channel: "raw",
+            datatype: "buffer",
+            dat: buffer
+        }
+    }
+
+    const headerLength = Number(buffer.slice(signature.length, signature.length + 4))
+    const metadataRaw = String(buffer.slice((4 + signature.length), headerLength))
+    const dataBuffer = buffer.slice(headerLength, buffer.length)
+    const metadata = []
+    
+    for (const entry of metadataRaw.split("|")) {
+        metadata.push(entry)
+    }
+
+    const packet = {channel: metadata[0], datatype: metadata[1], data: undefined}
+
+    //bufer
+    if (packet.datatype == "buffer") {
+        packet.data = dataBuffer
+        return packet
+    }
+
+    //string
+    if (packet.datatype == "string") {
+        packet.data = String(dataBuffer)
+        return packet
+    }
+
+    //number
+    if (packet.datatype == "number") {
+        packet.data = Number(dataBuffer)
+        return packet
+    }
+    
+    //object/json
+    if (packet.datatype == "object") {
+        packet.data = JSON.parse(String(dataBuffer))
+        return packet
     }
 }
 
 function encode(channel, data) {
-    let buf = data
-    let datatype = typeof(data)
+    let datatype = false
+    let buffer
 
-    if (!Buffer.isBuffer(buf)) {
-        if (typeof(buf == "object")) {
-            buf = Buffer.from(JSON.stringify(buf))
-        }
-        else {
-            buf = Buffer.from(buf)
-        }
-    }
-    else {
+    //encode data
+    if (Buffer.isBuffer(data)) {
         datatype = "buffer"
     }
 
-    const marker = Buffer.concat([signature, Buffer.from(channel), splitter, Buffer.from(datatype), signature])
-
-
-    return Buffer.concat([marker, buf])
-}
-
-function checkSignature(buffer) {
-    const check = buffer.slice(0, signature.length)
-
-    if (String(check) == String(signature)) {
-        return true
+    if (!datatype) {
+        datatype = typeof(data)
     }
 
-    return false
-}
-
-function decodeData(data, type) {
-    if (type == "buffer") {
-        return data
-    }
-    if (type == "string") {
-        return String(data).slice(1,-1)
-    }
-    if (type == "object") {
-        return JSON.parse(String(data))
-    }
-    if (type == "number") {
-        return Number(data)
-    }
-
-    return data
-}
-
-function decode(buffer) {
-    if (checkSignature(buffer)) {
-        const noSignature = buffer.slice(signature.length, buffer.length)
-
-        const metadata = String(noSignature.slice(0, noSignature.indexOf(signature))).split("||")
-        const data = noSignature.slice(noSignature.indexOf(signature) + signature.length, noSignature.length)
-
-        const channel = metadata[0]
-        const datatype = metadata[1]
-        const decodedData = decodeData(data, datatype)
-
-        return {channel: channel, datatype: datatype, data: decodedData}
+    if (datatype != "buffer") {
+        if (datatype == "object") {
+            buffer = Buffer.from(JSON.stringify(data))
+        }
+        else {
+            //maybe problematisch
+            buffer = Buffer.from(String(data))
+        }
     }
     else {
-        return buffer
+        buffer = data
     }
+
+    //check buffer length
+    if (buffer.length > 65000) {
+        throw new Error("Message too large: Max Buffer size is 65000 bytes")
+    }
+
+    //create header
+    const header = encodeHeader(channel, datatype)
+    const packet = Buffer.concat([header, buffer])
+    
+    return packet
+}
+
+function encodeHeader(channel, datatype, custom) {
+    let length
+    let metadata = ""
+
+    addMetadata(channel)
+    addMetadata(datatype)
+
+    if (custom != undefined) {
+        for (const str of custom) {
+            if (checkString(str)) {
+                addMetadata(str)
+            }
+            else {
+                throw new Error(`Invalid channel name ${channel} Illegal channel names/chars: ${reserved}`)
+            }
+        }
+    }
+
+    function addMetadata(str) {
+        if (metadata.length > 0) {
+            metadata += "|"
+        }
+
+        metadata += str
+    }
+
+    function fixNrLength(nr) {
+        let str = String(nr)
+
+        while (str.length < 4) {
+            str = "0" + str
+        }
+
+        return str
+    }
+
+    const metaBuffer = Buffer.from(metadata)
+    const headerLengthString = fixNrLength(metaBuffer.length + signature.length + 4)
+    const header = Buffer.concat([signature, Buffer.from(headerLengthString), metaBuffer])    
+
+    return header
+}
+
+function checkString(str) {
+    if (typeof(str) != "string") {
+        return false
+    }
+
+    if (str.includes("|")) {
+        return false
+    }
+
+    for (const internal of reserved) {
+        if (str.includes(internal)) {
+            return false
+        }
+    }
+
+    return true
 }
 
 function createClient() {
@@ -107,9 +186,6 @@ function createClient() {
             log(`connection established with ${info.address}:${info.port}`)
 
             timeout = data.data
-        }
-        if (data.channel == "disconnected") {
-            log(`connection with ${info.address}:${info.port} timed out`)
         }
     }
 
@@ -130,14 +206,19 @@ function createClient() {
                 internalAction(data, info)
             }
             else {
-                //log(`Message recieved from ${info.address}:${info.port}`)
+                log(`Message recieved from ${info.address}:${info.port}`)
                 events.dispatch(data.channel, data.data)
             }
         }
     })
 
     events.emit = (channel, data) => {
-        dispatch(channel, data)
+        if (checkString(channel)) {
+            dispatch(channel, data)
+        }
+        else {
+            throw new Error(`Invalid channel name ${channel} Illegal channel names/chars: ${reserved}`)
+        }
     }
 
     function dispatch(channel, data) {
@@ -164,11 +245,14 @@ function createServer() {
     const events = new EventEmitter();
     const clients = []
 
+    //scuffed naming fix
+    events.dispatch = events.emit
+
     function registerClient(data, client) {
         let registered = false
 
         for (const knownClient of clients) {
-            if (client.address == knownClient.address) {
+            if (client.address == knownClient.address && client.port == knownClient.port) {
                 registered = true
 
                 knownClient.address = client.address
@@ -180,9 +264,19 @@ function createServer() {
         if (!registered) {
             //create event emitter for client
             const newClient = new EventEmitter()
+            
+            //scuffed naming fix
+            newClient.dispatch = newClient.emit
 
-            newClient.send = (channel, data) => {
-                dispatch(channel, data, newClient)
+            newClient.emit = (channel, data) => {
+                if (clients.includes(newClient)) {
+                    if (checkString(channel)) {
+                        dispatch(channel, data, newClient)
+                    }
+                    else {
+                        throw new Error(`Invalid channel name ${channel} Illegal channel names/chars: ${reserved}`)
+                    }
+                }
             }
 
             newClient.address = client.address
@@ -191,7 +285,7 @@ function createServer() {
 
             clients.push(newClient)
 
-            events.emit("connection", newClient)
+            events.dispatch("connection", newClient)
             dispatch("connection", timeout, newClient)
         }
     }
@@ -204,7 +298,7 @@ function createServer() {
                 console.log(err);
             }
             else {
-                //log(`Data Sent to ${client.address}:${client.port}`)
+                log(`Data Sent to ${client.address}:${client.port}`)
             }
         })
     }
@@ -230,16 +324,28 @@ function createServer() {
             registerClient(data, info)
 
             //emit on main emitter
-            events.emit(data.channel, data.data)
+            events.dispatch(data.channel, data.data)
 
             //emit on client object
             const client = getClient(info)
             
             if (client) {
-                client.emit(data.channel, data.data)
+                client.dispatch(data.channel, data.data)
             }
         }
     })
+
+    //broadcast message to all clients
+    events.emit = (channel, data) => {
+        if (checkString(channel)) {
+            for (const c of clients) {
+                dispatch(channel, data, c)
+            }
+        }
+        else {
+            throw new Error(`Invalid channel name ${channel} Illegal channel names/chars: ${reserved}`)
+        }
+    }
 
     events.listen = (port, callback) => {
         server.bind(port, "0.0.0.0", () => {
