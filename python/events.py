@@ -18,6 +18,6 @@ class EventEmitter(object):
     def on(self, event_name, handler):
         self.event_handlers[event_name].append(handler)
 
-    def emit(self, event_name, *args, **kwargs):
+    def emitEvent(self, event_name, *args, **kwargs):
         for handler in self.event_handlers[event_name]:
             handler(*args, **kwargs)

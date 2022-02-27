@@ -1,9 +1,9 @@
-  const udp = require('dgram');
+const udp = require('dgram');
 const EventEmitter = require('events');
 
 const signature = Buffer.from("[udplus]")
 var timeout = 3000
-const reserved = [signature, "connection", "disconnected", "keep-alive", "|"]
+const reserved = ["connection", "disconnected", "keep-alive", "|"]
 var logging = true
 
 
@@ -34,7 +34,7 @@ function decode(buffer) {
         return {
             channel: "raw",
             datatype: "buffer",
-            dat: buffer
+            data: buffer
         }
     }
 
@@ -113,7 +113,6 @@ function encode(channel, data) {
 }
 
 function encodeHeader(channel, datatype, custom) {
-    let length
     let metadata = ""
 
     addMetadata(channel)
@@ -252,12 +251,17 @@ function createServer() {
         let registered = false
 
         for (const knownClient of clients) {
-            if (client.address == knownClient.address && client.port == knownClient.port) {
+            if (client.address == knownClient.address) {
                 registered = true
+                const knownPort = knownClient.port
 
                 knownClient.address = client.address
                 knownClient.port = client.port
                 knownClient.lastSignal = Date.now()
+
+                if (knownPort != client.port) {
+                    dispatch("connection", timeout, knownClient)
+                }
             }
         }
 
@@ -319,6 +323,8 @@ function createServer() {
 
     server.on("message", (buffer, info) => {
         const data = decode(buffer)
+
+        //log(`Data received from: ${info.address}`)
 
         if (typeof data === "object") {
             registerClient(data, info)
