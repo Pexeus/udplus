@@ -327,7 +327,9 @@ function createServer() {
         //log(`Data received from: ${info.address}`)
 
         if (typeof data === "object") {
-            registerClient(data, info)
+            if (data.channel != "raw") {
+                registerClient(data, info)
+            }
 
             //emit on main emitter
             events.dispatch(data.channel, data.data)
