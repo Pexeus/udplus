@@ -1,4 +1,5 @@
 
+
 # udplus
 
 **⚠️ WORK IN PROGRESS ⚠️**
@@ -8,14 +9,10 @@ This Package offers a simple and easy to set up wrapper around Nodes internal "d
 ## Creating a Server
 
     const  udplus = require("udplus")
-    const  server = udplus.createServer(port)
+    const  server = udplus.createServer()
     
     server.listen(3000, info  => {
 		console.log("listening on: " + info);
-	})
-	
-	client.on("connection", info  => {
-		console.log(info);
 	})
 
 ## Connecting Client to local Server
